@@ -16,6 +16,7 @@ from report.markdown_generator import MarkdownReportGenerator
 from github_provider import GitHubProvider
 from context_manager import PRContextManager
 from jira_ticket_extractor import JiraTicketExtractor
+from codebase_context import CodebaseContextProvider
 
 def load_env():
     """Load environment variables from .env file"""
@@ -123,6 +124,10 @@ def analyze_pr(pr_url: str, bedrock_client: BedrockClient, report_gen: MarkdownR
     print(f"📋 PR #{pr_number}: {pr_info['title']}")
     
     context_mgr = PRContextManager(pr_number)
+
+    # Initialize codebase context provider (uses Probe if available, falls back to CODING_STANDARDS.md)
+    repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    codebase_ctx = CodebaseContextProvider(repo_path=repo_root)
 
     # Validate commit messages
     commits = github.get_pr_commits()
@@ -246,10 +251,14 @@ def analyze_pr(pr_url: str, bedrock_client: BedrockClient, report_gen: MarkdownR
             continue
 
         print(f"📄 Finding new issues: {filename}")
+        codebase_context = codebase_ctx.get_context_for_file(filename, code, language)
+        if codebase_context:
+            print(f"🔍 Codebase context loaded for {filename}")
         results = bedrock_client.find_new_issues(
             code, language, filename,
             known_issues=known_issues,
-            ticket_info=jira_context or ticket_info
+            ticket_info=jira_context or ticket_info,
+            codebase_context=codebase_context
         )
 
         if 'error' in results:
