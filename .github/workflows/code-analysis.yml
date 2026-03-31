@@ -23,17 +23,30 @@ jobs:
         contains(github.event.comment.body, 'analyze')))
     
     steps:
-      - name: Checkout code
+      - name: Checkout repository (full repo for codebase context)
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      
+          ref: main
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
         env:
           FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+      - name: Install Probe (codebase search)
+        run: curl -fsSL https://raw.githubusercontent.com/probelabs/probe/main/install.sh | sh
+        continue-on-error: true
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-boto3-pygithub-faiss-sentence-transformers
+          restore-keys: |
+            ${{ runner.os }}-pip-
       
       - name: Install dependencies
         run: |
@@ -61,6 +74,7 @@ jobs:
           GITHUB_PR_URL: ${{ steps.pr_url.outputs.url }}
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
           AWS_REGION: ${{ secrets.AWS_REGION || 'ap-south-1' }}
           BEDROCK_MODEL: ${{ secrets.BEDROCK_MODEL || 'apac.amazon.nova-pro-v1:0' }}
           BEDROCK_TEMPERATURE: '0.3'
@@ -68,6 +82,7 @@ jobs:
           JIRA_URL: ${{ secrets.JIRA_URL }}
           JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
           JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+          FAISS_S3_BUCKET: ${{ secrets.FAISS_S3_BUCKET }}
         run: |
           python github_action_runner.py
         working-directory: comprinno_pr_agent
