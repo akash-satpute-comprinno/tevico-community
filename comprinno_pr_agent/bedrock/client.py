@@ -146,7 +146,8 @@ Return ONLY valid JSON:
             return {"status": "unknown", "reason": str(e)}
 
     def find_new_issues(self, code: str, language: str, file_path: str,
-                        known_issues: list, ticket_info: dict = None) -> Dict[str, Any]:
+                        known_issues: list, ticket_info: dict = None,
+                        codebase_context: str = "") -> Dict[str, Any]:
         """Ask AI to find only NEW issues not already tracked"""
         known_summary = "\n".join(
             f"- [{f.get('category')}] Line {f.get('line')}: {f.get('description', '')[:80]}"
@@ -177,6 +178,16 @@ Be a pragmatic senior engineer — evaluate intent and outcome, not surface-leve
 
 """
 
+        codebase_section = ""
+        if codebase_context:
+            codebase_section = f"""## Codebase Context
+The following shows how similar patterns are implemented elsewhere in this codebase.
+Use this to evaluate consistency, detect duplication, and flag convention violations.
+
+{codebase_context}
+
+"""
+
         prompt = f"""You are a senior software engineer performing a thorough code review.
 
 Your task has TWO parts:
@@ -185,6 +196,7 @@ Your task has TWO parts:
 Review the code and identify issues that are NOT already in the known issues list.
 Do NOT re-report anything already in the known list.
 Focus on: security, correctness, performance, reliability, code quality.
+Also check for: inconsistency with codebase patterns, duplication of existing code, convention violations.
 
 ## PART 2 — Evaluate Jira Ticket Completion
 Based on the Jira ticket context provided, evaluate what has been done, what is partially done, and what is still missing.
@@ -194,7 +206,7 @@ Judge by the actual behavior and outcome of the code, not literal keyword matchi
 ## Already Known Issues (DO NOT re-report these)
 {known_summary}
 
-{ticket_section}
+{ticket_section}{codebase_section}
 ## Code to Review ({language}) — {file_path}
 ```{language}
 {code}
