@@ -23,7 +23,7 @@ jobs:
         contains(github.event.comment.body, 'analyze')))
     
     steps:
-      - name: Checkout repository (full repo for codebase context)
+      - name: Checkout main branch (agent code)
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -44,10 +44,10 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-boto3-pygithub-faiss-sentence-transformers
+          key: ${{ runner.os }}-pip-v2-boto3-pygithub-faiss
           restore-keys: |
-            ${{ runner.os }}-pip-
-      
+            ${{ runner.os }}-pip-v2-
+
       - name: Install dependencies
         run: |
           pip install boto3==1.40.45
@@ -58,7 +58,7 @@ jobs:
           pip install sentence-transformers>=2.2.2
           pip install python-dotenv>=1.0.0
           pip install requests>=2.28.0
-      
+
       - name: Get PR URL
         id: pr_url
         run: |
@@ -67,7 +67,7 @@ jobs:
           else
             echo "url=${{ github.event.issue.pull_request.html_url }}" >> $GITHUB_OUTPUT
           fi
-      
+
       - name: Run Deep Code Analysis
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -84,5 +84,6 @@ jobs:
           JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
           FAISS_S3_BUCKET: ${{ secrets.FAISS_S3_BUCKET }}
         run: |
+          find . -name "*.pyc" -delete 2>/dev/null || true
           python github_action_runner.py
         working-directory: comprinno_pr_agent
