@@ -2,7 +2,7 @@ import boto3
 from tevico.engine.entities.report.check_model import CheckReport, CheckStatus, AwsResource, ResourceStatus
 from tevico.engine.entities.check.check import Check
 
-class ec2_ssh_check(Check):  # BUG: class name doesn't match filename
+class ec2_unrestricted_ssh_access(Check):  # BUG: class name doesn't match filename
     def execute(self, connection: boto3.Session) -> CheckReport:
         report = CheckReport(name=__name__)
         report.resource_ids_status = []
