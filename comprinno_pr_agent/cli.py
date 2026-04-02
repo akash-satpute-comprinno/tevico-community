@@ -235,7 +235,13 @@ def analyze_pr(pr_url: str, bedrock_client: BedrockClient, report_gen: MarkdownR
                 context_mgr.mark_resolved(old_finding['id'], old_finding.get('from_pr'))
 
     # Step 2 — Find NEW issues per file (excluding known ones)
-    known_issues = previous_findings or []
+    # Include ALL FAISS findings (open + fixed) so Bedrock never re-reports them
+    all_faiss_findings = context_mgr.metadata  # all findings ever stored for this PR
+    known_issues = previous_findings + [
+        {'category': m['category'], 'line': str(m['line']), 'description': m['description']}
+        for m in all_faiss_findings
+        if f"{m['category']}:{m['line']}" not in {f"{f['category']}:{f['line']}" for f in previous_findings}
+    ]
     for file_info in pr_files:
         filename = file_info['filename']
         language = detect_language(filename)
