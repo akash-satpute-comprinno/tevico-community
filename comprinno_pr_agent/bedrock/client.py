@@ -182,7 +182,9 @@ Be a pragmatic senior engineer — evaluate intent and outcome, not surface-leve
         if codebase_context:
             codebase_section = f"""## Codebase Context
 The following shows how similar patterns are implemented elsewhere in this codebase.
-Use this to evaluate consistency, detect duplication, and flag convention violations.
+CRITICAL: When suggesting fixes, you MUST follow the EXACT patterns shown here — naming conventions, structure, error handling, imports, logging format.
+Do NOT apply generic best practices that contradict what this codebase actually does.
+If the codebase shows a specific pattern, your suggested fix must match it exactly.
 
 {codebase_context}
 
