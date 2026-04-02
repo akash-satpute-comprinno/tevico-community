@@ -79,7 +79,7 @@ class PRContextManager:
             json.dump(self.metadata, f, indent=2)
         self._upload_to_s3()
 
-    def is_similar_issue_known(self, finding: Dict, threshold: float = 0.85) -> bool:
+    def is_similar_issue_known(self, finding: Dict, threshold: float = 0.75) -> bool:
         """Check if a semantically similar issue already exists in FAISS"""
         if self.index.ntotal == 0:
             return False
