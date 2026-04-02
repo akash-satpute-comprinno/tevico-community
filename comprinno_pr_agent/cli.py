@@ -295,6 +295,20 @@ def analyze_pr(pr_url: str, bedrock_client: BedrockClient, report_gen: MarkdownR
             if any(f.get('line_start', 0) <= ln <= f.get('line_end', 0) for ln in changed_line_numbers)
         ]
 
+        # Validate code_snippet exists in current file — discard false positives
+        # where Bedrock flags code that was already fixed or doesn't exist
+        validated_findings = []
+        for f in relevant_findings:
+            snippet = f.get('code_snippet', '').strip()
+            if snippet and len(snippet) > 5:
+                # Normalize whitespace for comparison
+                normalized_snippet = ' '.join(snippet.split())
+                normalized_code = ' '.join(code.split())
+                if normalized_snippet not in normalized_code:
+                    continue  # code no longer exists — false positive, skip
+            validated_findings.append(f)
+        relevant_findings = validated_findings
+
         for f in relevant_findings:
             f['file'] = filename
 
