@@ -20,7 +20,7 @@ class ec2_unrestricted_ssh_access(Check):
             sts_client = connection.client('sts')
             account_id = sts_client.get_caller_identity()['Account']
             region = connection.region_name
-            ec2_client = connection.client('ec2')
+            ec2_client = connection.client("ec2", region_name=region)
 
             # Pagination to get all security groups
             security_groups = []
@@ -28,7 +28,7 @@ class ec2_unrestricted_ssh_access(Check):
 
             while True:
                 response = ec2_client.describe_security_groups(NextToken=next_token) if next_token else ec2_client.describe_security_groups()
-                security_groups.extend(response['SecurityGroups'])
+                security_groups += response["SecurityGroups"]
                 next_token = response.get('NextToken')
                 if not next_token:
                     break
