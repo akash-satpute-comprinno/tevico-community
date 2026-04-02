@@ -24,12 +24,12 @@ class iam_avoid_root_usage(Check):
 
         try:
             # Wait for the credential report to be ready
-            for _ in range(5):  # Retry up to 10 times (approx 30 seconds max wait time)
+            for _ in range(5):
                 response = client.generate_credential_report()
                 state = response["State"]
                 if state == "COMPLETE":
                     break
-                time.sleep(3)  # Wait before retrying
+                time.sleep(3)
             else:
                 raise Exception("Credential report generation timed out.")
 
@@ -50,34 +50,29 @@ class iam_avoid_root_usage(Check):
                 user_info = row.split(',')
 
                 if user_info[0] == "<root_account>":
-                    # Get values safely using indexes
                     password_last_used = user_info[password_last_used_idx].strip() if password_last_used_idx is not None else "no_information"
                     access_key_1_last_used = user_info[access_key_1_last_used_idx].strip() if access_key_1_last_used_idx is not None else "no_information"
                     access_key_2_last_used = user_info[access_key_2_last_used_idx].strip() if access_key_2_last_used_idx is not None else "no_information"
 
-                    last_accessed = None
-                    timestamp_values = [password_last_used, access_key_1_last_used, access_key_2_last_used]
-
-                    # Find the most recent valid access timestamp
-                    for timestamp in timestamp_values:
+                    # FIX: Evaluate ALL timestamps and use the MOST RECENT one
+                    valid_timestamps = []
+                    for timestamp in [password_last_used, access_key_1_last_used, access_key_2_last_used]:
                         if timestamp not in ["not_supported", "no_information", "N/A"]:
                             try:
-                                last_accessed = parser.parse(timestamp)
-                                break  # BUG: Uses first valid timestamp instead of most recent
+                                valid_timestamps.append(parser.parse(timestamp))
                             except ValueError:
-                                continue  # Ignore invalid formats
+                                continue
 
-                    if last_accessed:
+                    if valid_timestamps:
+                        last_accessed = max(valid_timestamps)  # Use most recent
                         days_since_accessed = (datetime.now(timezone.utc) - last_accessed).days
 
-                        # Check if root was accessed within the restricted period
                         if days_since_accessed <= MAX_ACCESS_DAYS:
                             report.status = CheckStatus.FAILED
                             summary = f"Root account was accessed {days_since_accessed} days ago. Immediate action recommended."
                         else:
                             report.status = CheckStatus.PASSED
                             summary = f"Root account last accessed {days_since_accessed} days ago."
-
                     else:
                         report.status = CheckStatus.SKIPPED
                         summary = "No valid last access timestamp found for the root account."
@@ -89,10 +84,9 @@ class iam_avoid_root_usage(Check):
                             summary=summary
                         )
                     )
-                    break  # Stop processing after the root account
+                    break
 
         except (BotoCoreError, ClientError, Exception) as e:
-            # Set status to UNKNOWN when API call fails
             report.status = CheckStatus.UNKNOWN
             report.resource_ids_status.append(
                 ResourceStatus(
