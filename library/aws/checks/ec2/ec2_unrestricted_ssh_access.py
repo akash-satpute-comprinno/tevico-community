@@ -17,7 +17,7 @@ class ec2_unrestricted_ssh_access(Check):
         report.resource_ids_status = []
 
         try:
-            sts_client = connection.client('sts')
+            sts_client = connection.client("sts", region_name="us-east-1")
             account_id = sts_client.get_caller_identity()['Account']
             region = connection.region_name
             ec2_client = connection.client("ec2", region_name=region)
