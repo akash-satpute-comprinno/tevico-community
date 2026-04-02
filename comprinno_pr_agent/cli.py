@@ -474,20 +474,29 @@ def generate_pr_summary(pr_info: dict, files: List, findings: List, previous_com
         if ticket_completion and any(ticket_completion.values()):
             summary += f"### 📋 Jira Ticket Completion — {ticket_info['ticket_id']}\n\n"
             summary += f"**Ticket:** {ticket_info['title']}\n\n"
+
+            def format_tc_item(item):
+                """Normalize ticket completion item — handle both string and dict formats"""
+                if isinstance(item, dict):
+                    req = item.get('requirement', item.get('done', ''))
+                    missing = item.get('missing', item.get('not_done', ''))
+                    return f"{req}" + (f" — missing: {missing}" if missing else "")
+                return str(item)
+
             if ticket_completion.get('done'):
                 summary += f"**✅ Done:**\n"
                 for item in ticket_completion['done']:
-                    summary += f"- {item}\n"
+                    summary += f"- {format_tc_item(item)}\n"
                 summary += "\n"
             if ticket_completion.get('partial'):
                 summary += f"**⚠️ Partially Done:**\n"
                 for item in ticket_completion['partial']:
-                    summary += f"- {item}\n"
+                    summary += f"- {format_tc_item(item)}\n"
                 summary += "\n"
             if ticket_completion.get('not_done'):
                 summary += f"**❌ Not Yet Done:**\n"
                 for item in ticket_completion['not_done']:
-                    summary += f"- {item}\n"
+                    summary += f"- {format_tc_item(item)}\n"
                 summary += "\n"
 
     # Resolved issues from previous review — deduplicated by category
