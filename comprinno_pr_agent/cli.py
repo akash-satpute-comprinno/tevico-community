@@ -242,6 +242,17 @@ def analyze_pr(pr_url: str, bedrock_client: BedrockClient, report_gen: MarkdownR
         for m in all_faiss_findings
         if f"{m['category']}:{m['line']}" not in {f"{f['category']}:{f['line']}" for f in previous_findings}
     ]
+
+    # Collect all changed file contents including non-code files (YAML, JSON, config)
+    # for ticket completion evaluation
+    all_changed_contents = {}
+    for file_info in pr_files:
+        fname = file_info['filename']
+        if file_info.get('status') != 'removed':
+            content = github.get_file_content(fname)
+            if content:
+                all_changed_contents[fname] = content[:1000]  # cap per file
+
     for file_info in pr_files:
         filename = file_info['filename']
         language = detect_language(filename)
@@ -264,7 +275,8 @@ def analyze_pr(pr_url: str, bedrock_client: BedrockClient, report_gen: MarkdownR
             code, language, filename,
             known_issues=known_issues,
             ticket_info=jira_context or ticket_info,
-            codebase_context=codebase_context
+            codebase_context=codebase_context,
+            all_pr_files=all_changed_contents
         )
 
         if 'error' in results:
