@@ -64,6 +64,7 @@ class PRContextManager:
     def _load_or_create_index(self):
         if self.index_file.exists():
             return faiss.read_index(str(self.index_file))
+        # Use IndexFlatIP with normalized vectors = cosine similarity
         return faiss.IndexFlatIP(self.embedding_dim)
 
     def _load_metadata(self) -> List[Dict]:
@@ -78,8 +79,20 @@ class PRContextManager:
             json.dump(self.metadata, f, indent=2)
         self._upload_to_s3()
 
+    def is_similar_issue_known(self, finding: Dict, threshold: float = 0.85) -> bool:
+        """Check if a semantically similar issue already exists in FAISS"""
+        if self.index.ntotal == 0:
+            return False
+        text = f"{finding.get('category', '')} {finding.get('description', '')} {finding.get('code_snippet', '')}"
+        embedding = self.encoder.encode([text])[0]
+        embedding = np.array([embedding], dtype=np.float32)
+        # Normalize for cosine similarity
+        faiss.normalize_L2(embedding)
+        distances, _ = self.index.search(embedding, k=1)
+        return float(distances[0][0]) >= threshold
+
     def store_findings(self, findings: List[Dict]):
-        """Store findings in FAISS — skip duplicates by category+line+file"""
+        """Store findings in FAISS — skip duplicates by category+line+file and semantic similarity"""
         existing_keys = {
             f"{m['category']}:{m['line']}:{m['file']}"
             for m in self.metadata if m['status'] == 'open'
@@ -88,10 +101,15 @@ class PRContextManager:
             key = f"{finding.get('category','')}:{finding.get('line_start',0)}:{finding.get('file','')}"
             if key in existing_keys:
                 continue
+            # Also skip if semantically similar issue already exists
+            if self.is_similar_issue_known(finding):
+                continue
             existing_keys.add(key)
             text = f"{finding.get('category', '')} {finding.get('description', '')} {finding.get('code_snippet', '')}"
             embedding = self.encoder.encode([text])[0]
-            self.index.add(np.array([embedding], dtype=np.float32))
+            norm_embedding = np.array([embedding], dtype=np.float32)
+            faiss.normalize_L2(norm_embedding)
+            self.index.add(norm_embedding)
             self.metadata.append({
                 'id': len(self.metadata),
                 'pr_number': self.pr_number,
