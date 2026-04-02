@@ -63,7 +63,7 @@ class iam_avoid_root_usage(Check):
                         if timestamp not in ["not_supported", "no_information", "N/A"]:
                             try:
                                 last_accessed = parser.parse(timestamp)
-                                break  # Use the first valid timestamp found
+                                break  # BUG: Uses first valid timestamp instead of most recent
                             except ValueError:
                                 continue  # Ignore invalid formats
 
