@@ -147,12 +147,22 @@ Return ONLY valid JSON:
 
     def find_new_issues(self, code: str, language: str, file_path: str,
                         known_issues: list, ticket_info: dict = None,
-                        codebase_context: str = "") -> Dict[str, Any]:
+                        codebase_context: str = "", all_pr_files: dict = None) -> Dict[str, Any]:
         """Ask AI to find only NEW issues not already tracked"""
         known_summary = "\n".join(
             f"- [{f.get('category')}] Line {f.get('line')}: {f.get('description', '')[:80]}"
             for f in known_issues
         ) or "None"
+
+        # Include all changed files (YAML, config, etc.) for ticket completion evaluation
+        all_files_section = ""
+        if all_pr_files:
+            other_files = {k: v for k, v in all_pr_files.items() if k != file_path}
+            if other_files:
+                all_files_section = "## Other Changed Files in This PR (for ticket completion evaluation)\n"
+                for fname, content in other_files.items():
+                    all_files_section += f"\n### {fname}\n```\n{content}\n```\n"
+                all_files_section += "\n"
 
         ticket_section = ""
         if ticket_info:
@@ -203,13 +213,13 @@ Also check for: inconsistency with codebase patterns, duplication of existing co
 
 ## PART 2 — Evaluate Jira Ticket Completion
 Based on the Jira ticket context provided, evaluate what has been done, what is partially done, and what is still missing.
-Consider the full ticket — title, description, and acceptance criteria together.
+Consider ALL changed files in this PR (including YAML, config files listed below) — not just the main code file.
 Judge by the actual behavior and outcome of the code, not literal keyword matching.
 
 ## Already Known Issues (DO NOT re-report these)
 {known_summary}
 
-{ticket_section}{codebase_section}
+{ticket_section}{codebase_section}{all_files_section}
 ## Code to Review ({language}) — {file_path}
 ```{language}
 {code}
