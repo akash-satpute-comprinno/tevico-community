@@ -24,6 +24,7 @@ class CodebaseContextProvider:
 
     def _run_probe(self, query: str, language: str = None, max_tokens: int = 2000, path: str = None) -> str:
         """Run a probe search query and return results"""
+        print(f"🔧 Probe available: {self.probe_available}, repo_path: {self.repo_path}")
         if not self.probe_available:
             return ""
         try:
@@ -41,6 +42,7 @@ class CodebaseContextProvider:
         Get relevant codebase context for a changed file.
         Searches for similar patterns, conventions, and related code.
         """
+        print(f"🔧 Probe available: {self.probe_available}, repo_path: {self.repo_path}")
         if not self.probe_available:
             return self._get_static_context(file_path)
 
@@ -52,6 +54,7 @@ class CodebaseContextProvider:
         file_dir = os.path.dirname(file_path)
         dir_results = self._run_probe("class", language=language, max_tokens=1200,
                                        path=os.path.join(self.repo_path, file_dir))
+        print(f"🔧 Dir search ({file_dir}): {len(dir_results)} chars returned")
         if dir_results and file_name not in dir_results:
             context_parts.append(f"### Existing classes in same directory (follow these conventions exactly):\n{dir_results}")
 
@@ -66,6 +69,7 @@ class CodebaseContextProvider:
         if error_results:
             context_parts.append(f"### Error handling conventions:\n{error_results}")
 
+        print(f"🔧 Total context parts: {len(context_parts)}")
         if not context_parts:
             return ""
 
