@@ -285,13 +285,22 @@ def analyze_pr(pr_url: str, bedrock_client: BedrockClient, report_gen: MarkdownR
         codebase_context = codebase_ctx.get_context_for_file(filename, code, language)
         if codebase_context:
             print(f"🔍 Codebase context loaded for {filename}")
+        # Build commit history summary for Bedrock context
+        commit_history_summary = ""
+        if commits:
+            commit_history_summary = "## Commit History in This PR\n"
+            for c in commits:
+                commit_history_summary += f"- `{c['sha']}` {c['message'].split(chr(10))[0][:80]} ({c['author']})\n"
+            commit_history_summary += "\nUse this to understand how the code evolved. Focus on the latest changes.\n"
+
         results = bedrock_client.find_new_issues(
             code, language, filename,
             known_issues=known_issues,
             ticket_info=jira_context or ticket_info,
             codebase_context=codebase_context,
             all_pr_files=all_changed_contents,
-            coding_standards=coding_standards
+            coding_standards=coding_standards,
+            commit_history=commit_history_summary
         )
 
         if 'error' in results:
