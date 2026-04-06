@@ -40,9 +40,11 @@ class CodebaseContextProvider:
             return ""
         try:
             search_path = path if path and os.path.exists(path) else self.repo_path
-            cmd = [self.probe_bin, "search", query, search_path, f"--max-tokens={max_tokens}"]
+            # Correct probe CLI syntax: probe search [--language <LANG>] <PATTERN> <PATH>
+            cmd = [self.probe_bin, "search"]
             if language:
-                cmd += [f"--lang={language}"]
+                cmd += [f"--language={language}"]
+            cmd += [query, search_path]
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
             return result.stdout.strip() if result.returncode == 0 else ""
         except Exception:
@@ -64,10 +66,10 @@ class CodebaseContextProvider:
         file_dir = os.path.dirname(file_path)
         dir_path = os.path.join(self.repo_path, file_dir)
         print(f"🔧 Searching dir: {dir_path} (exists: {os.path.exists(dir_path)})")
-        dir_results = self._run_probe("Check execute connection", language=language, max_tokens=1200, path=dir_path)
+        dir_results = self._run_probe("execute", language=language, max_tokens=1200, path=dir_path)
         print(f"🔧 Dir search returned: {len(dir_results)} chars")
         if dir_results and file_name not in dir_results:
-            context_parts.append(f"### Existing classes in same directory (follow these conventions exactly):\n{dir_results}")
+            context_parts.append(f"### Existing patterns in same directory (follow these conventions exactly):\n{dir_results}")
 
         # Search 2 — Find similar patterns by key terms
         for term in search_terms[:2]:
