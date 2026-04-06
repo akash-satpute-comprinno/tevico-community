@@ -69,6 +69,16 @@ jobs:
             echo "url=${{ github.event.issue.pull_request.html_url }}" >> $GITHUB_OUTPUT
           fi
 
+      - name: Debug Probe
+        run: |
+          echo "=== probe version ==="
+          probe --version
+          echo "=== probe search test ==="
+          probe search "execute" library/aws/checks/rds/ --lang=python --max-tokens=200 || true
+          echo "=== probe search 2 ==="
+          probe search "execute" . --lang=python --max-tokens=200 | head -20 || true
+        continue-on-error: true
+
       - name: Run Deep Code Analysis
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
