@@ -148,7 +148,7 @@ Return ONLY valid JSON:
     def find_new_issues(self, code: str, language: str, file_path: str,
                         known_issues: list, ticket_info: dict = None,
                         codebase_context: str = "", all_pr_files: dict = None,
-                        coding_standards: str = "") -> Dict[str, Any]:
+                        coding_standards: str = "", commit_history: str = "") -> Dict[str, Any]:
         """Ask AI to find only NEW issues not already tracked"""
         known_summary = "\n".join(
             f"- [{f.get('category')}] Line {f.get('line')}: {f.get('description', '')[:80]}"
@@ -211,6 +211,11 @@ The following are the official coding standards for this project. Validate the c
 
 """
 
+        commit_section = ""
+        if commit_history:
+            commit_section = f"""{commit_history}
+"""
+
         prompt = f"""You are a senior software engineer performing a thorough code review.
 
 Your task has TWO parts:
@@ -235,7 +240,7 @@ Judge by the actual behavior and outcome of the code, not literal keyword matchi
 ## Already Known Issues (DO NOT re-report these)
 {known_summary}
 
-{ticket_section}{codebase_section}{standards_section}{all_files_section}
+{ticket_section}{codebase_section}{standards_section}{commit_section}{all_files_section}
 ## Code to Review ({language}) — {file_path}
 ```{language}
 {code}
