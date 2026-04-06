@@ -11,15 +11,12 @@ from tevico.engine.entities.check.check import Check
 
 class rds_instance_multi_az(Check):
     def execute(self, connection: boto3.Session) -> CheckReport:
-        # Initialize report
         report = CheckReport(name=__name__)
-        report.status = CheckStatus.PASSED  # Default to PASSED
+        report.status = CheckStatus.PASSED
         report.resource_ids_status = []
 
         try:
             client = connection.client("rds")
-
-            # Pagination for listing all RDS instances
             instances = []
             next_token = None
 
@@ -27,11 +24,9 @@ class rds_instance_multi_az(Check):
                 response = client.describe_db_instances(Marker=next_token) if next_token else client.describe_db_instances()
                 instances.extend(response.get("DBInstances", []))
                 next_token = response.get("Marker")
-
                 if not next_token:
                     break
 
-            # If no RDS instances exist, mark as NOT_APPLICABLE
             if not instances:
                 report.status = CheckStatus.NOT_APPLICABLE
                 report.resource_ids_status.append(
@@ -43,11 +38,12 @@ class rds_instance_multi_az(Check):
                 )
                 return report
 
-            # Check each RDS instance for Multi-AZ deployment
             for instance in instances:
                 instance_name = instance["DBInstanceIdentifier"]
                 instance_arn = instance["DBInstanceArn"]
                 try:
+                    # BUG: Aurora instances always have MultiAZ=False even when cluster is Multi-AZ
+                    # This incorrectly flags all Aurora instances as FAILED
                     multi_az = instance.get("MultiAZ", False)
 
                     if multi_az:
@@ -56,7 +52,7 @@ class rds_instance_multi_az(Check):
                     else:
                         summary = f"Multi-AZ is NOT enabled for RDS instance {instance_name}."
                         status = CheckStatus.FAILED
-                        report.status = CheckStatus.FAILED  # At least one instance is non-compliant
+                        report.status = CheckStatus.FAILED
 
                     report.resource_ids_status.append(
                         ResourceStatus(
@@ -66,7 +62,6 @@ class rds_instance_multi_az(Check):
                         )
                     )
                 except Exception as e:
-                    # Handle AWS client errors
                     report.status = CheckStatus.UNKNOWN
                     report.resource_ids_status.append(
                         ResourceStatus(
@@ -78,7 +73,6 @@ class rds_instance_multi_az(Check):
                     )
 
         except Exception as e:
-            # Handle AWS client errors
             report.status = CheckStatus.UNKNOWN
             report.resource_ids_status.append(
                 ResourceStatus(
