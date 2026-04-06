@@ -5,31 +5,42 @@ for a given changed file — patterns, conventions, related code.
 """
 import subprocess
 import os
-import json
 from typing import Optional
 
 
 class CodebaseContextProvider:
     def __init__(self, repo_path: str = "."):
         self.repo_path = os.path.abspath(repo_path)
+        self.probe_bin = "probe"
         self.probe_available = self._check_probe()
 
     def _check_probe(self) -> bool:
-        """Check if probe binary is available"""
-        try:
-            result = subprocess.run(["probe", "--version"], capture_output=True, timeout=5)
-            return result.returncode == 0
-        except (FileNotFoundError, subprocess.TimeoutExpired):
-            return False
+        """Check if probe binary is available — try multiple locations"""
+        locations = [
+            "probe",
+            "/usr/local/bin/probe",
+            os.path.expanduser("~/.local/bin/probe"),
+            "/home/runner/.local/bin/probe"
+        ]
+        for probe_path in locations:
+            try:
+                r = subprocess.run([probe_path, "--version"], capture_output=True, timeout=5)
+                if r.returncode == 0:
+                    self.probe_bin = probe_path
+                    print(f"🔧 Probe found at: {probe_path}")
+                    return True
+            except (FileNotFoundError, subprocess.TimeoutExpired):
+                continue
+        print(f"🔧 Probe not found in any location")
+        return False
 
     def _run_probe(self, query: str, language: str = None, max_tokens: int = 2000, path: str = None) -> str:
         """Run a probe search query and return results"""
-        print(f"🔧 Probe available: {self.probe_available}, repo_path: {self.repo_path}")
         if not self.probe_available:
             return ""
         try:
             search_path = path if path and os.path.exists(path) else self.repo_path
-            cmd = ["probe", "search", query, search_path, f"--max-tokens={max_tokens}"]
+            cmd = [self.probe_bin, "search", query, search_path, f"--max-tokens={max_tokens}"]
             if language:
                 cmd += [f"--lang={language}"]
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
@@ -42,7 +53,6 @@ class CodebaseContextProvider:
         Get relevant codebase context for a changed file.
         Searches for similar patterns, conventions, and related code.
         """
-        print(f"🔧 Probe available: {self.probe_available}, repo_path: {self.repo_path}")
         if not self.probe_available:
             return self._get_static_context(file_path)
 
@@ -52,9 +62,10 @@ class CodebaseContextProvider:
 
         # Search 1 — Find similar files in the same directory (most relevant for conventions)
         file_dir = os.path.dirname(file_path)
-        dir_results = self._run_probe("class", language=language, max_tokens=1200,
-                                       path=os.path.join(self.repo_path, file_dir))
-        print(f"🔧 Dir search ({file_dir}): {len(dir_results)} chars returned")
+        dir_path = os.path.join(self.repo_path, file_dir)
+        print(f"🔧 Searching dir: {dir_path} (exists: {os.path.exists(dir_path)})")
+        dir_results = self._run_probe("class", language=language, max_tokens=1200, path=dir_path)
+        print(f"🔧 Dir search returned: {len(dir_results)} chars")
         if dir_results and file_name not in dir_results:
             context_parts.append(f"### Existing classes in same directory (follow these conventions exactly):\n{dir_results}")
 
@@ -79,21 +90,16 @@ class CodebaseContextProvider:
     def _extract_search_terms(self, file_name: str, code: str) -> list:
         """Extract meaningful search terms from file name and code"""
         terms = []
-
-        # From file name (e.g. cache_manager -> cache, manager)
         for word in file_name.replace('_', ' ').replace('-', ' ').split():
             if len(word) > 3:
                 terms.append(word)
-
-        # From class/function names in code
         import re
         class_names = re.findall(r'class\s+(\w+)', code)
         func_names = re.findall(r'def\s+(\w+)', code)
         for name in class_names[:2] + func_names[:3]:
             if len(name) > 4 and name not in ('self', 'init', 'main'):
                 terms.append(name)
-
-        return list(dict.fromkeys(terms))  # deduplicate preserving order
+        return list(dict.fromkeys(terms))
 
     def _get_static_context(self, file_path: str) -> str:
         """Fallback — read CODING_STANDARDS.md if probe not available"""
