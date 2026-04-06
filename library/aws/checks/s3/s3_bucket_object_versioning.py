@@ -37,6 +37,9 @@ class s3_bucket_object_versioning(Check):
                 )
                 return report
 
+            # FIX: track if any bucket fails
+            has_failure = False
+
             for bucket in bucket_list:
                 bucket_name = bucket["Name"]
                 bucket_arn = f"arn:aws:s3:::{bucket_name}"
@@ -46,7 +49,6 @@ class s3_bucket_object_versioning(Check):
                     versioning_status = versioning_response.get('Status')
 
                     if versioning_status == 'Enabled':
-                        # BUG: report.status never set to PASSED here
                         report.resource_ids_status.append(
                             ResourceStatus(
                                 resource=AwsResource(arn=bucket_arn),
@@ -55,7 +57,7 @@ class s3_bucket_object_versioning(Check):
                             )
                         )
                     elif versioning_status == 'Suspended':
-                        report.status = CheckStatus.FAILED
+                        has_failure = True
                         report.resource_ids_status.append(
                             ResourceStatus(
                                 resource=AwsResource(arn=bucket_arn),
@@ -64,7 +66,7 @@ class s3_bucket_object_versioning(Check):
                             )
                         )
                     else:
-                        report.status = CheckStatus.FAILED
+                        has_failure = True
                         report.resource_ids_status.append(
                             ResourceStatus(
                                 resource=AwsResource(arn=bucket_arn),
@@ -74,7 +76,7 @@ class s3_bucket_object_versioning(Check):
                         )
 
                 except (BotoCoreError, ClientError) as e:
-                    report.status = CheckStatus.UNKNOWN
+                    has_failure = True
                     report.resource_ids_status.append(
                         ResourceStatus(
                             resource=AwsResource(arn=bucket_arn),
@@ -83,6 +85,9 @@ class s3_bucket_object_versioning(Check):
                             exception=str(e)
                         )
                     )
+
+            # FIX: set final status based on results
+            report.status = CheckStatus.FAILED if has_failure else CheckStatus.PASSED
 
         except (BotoCoreError, ClientError) as e:
             report.status = CheckStatus.UNKNOWN
