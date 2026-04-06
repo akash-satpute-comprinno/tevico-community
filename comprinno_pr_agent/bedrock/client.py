@@ -211,6 +211,12 @@ Do NOT re-report anything already in the known list.
 Focus on: security, correctness, performance, reliability, code quality.
 Also check for: inconsistency with codebase patterns, duplication of existing code, convention violations.
 
+Additionally check for:
+- Deprecated methods or APIs introduced in this PR (only flag NEW changes, not existing code)
+- Outdated library usage or version-specific issues introduced in this PR
+- Hardcoded credentials, secrets, or sensitive values
+- Use of removed or unsupported features in the language/framework version
+
 ## PART 2 — Evaluate Jira Ticket Completion
 Based on the Jira ticket context provided, evaluate what has been done, what is partially done, and what is still missing.
 Consider ALL changed files in this PR (including YAML, config files listed below) — not just the main code file.
