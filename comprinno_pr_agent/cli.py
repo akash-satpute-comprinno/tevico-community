@@ -17,6 +17,7 @@ from github_provider import GitHubProvider
 from context_manager import PRContextManager
 from jira_ticket_extractor import JiraTicketExtractor
 from codebase_context import CodebaseContextProvider
+from config_loader import load_config, get_coding_standards, should_ignore_file
 
 def load_env():
     """Load environment variables from .env file"""
@@ -125,8 +126,12 @@ def analyze_pr(pr_url: str, bedrock_client: BedrockClient, report_gen: MarkdownR
     
     context_mgr = PRContextManager(pr_number)
 
-    # Initialize codebase context provider (uses Probe if available, falls back to CODING_STANDARDS.md)
+    # Load agent config from repo root
     repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    agent_config = load_config(repo_root)
+    coding_standards = get_coding_standards(agent_config, repo_root)
+
+    # Initialize codebase context provider (uses Probe if available, falls back to CODING_STANDARDS.md)
     codebase_ctx = CodebaseContextProvider(repo_path=repo_root)
 
     # Validate commit messages
@@ -259,6 +264,11 @@ def analyze_pr(pr_url: str, bedrock_client: BedrockClient, report_gen: MarkdownR
         if language == 'unknown':
             continue
 
+        # Skip files matching ignore patterns from config
+        if should_ignore_file(filename, agent_config):
+            print(f"⏭️  Skipping {filename} (matches ignore pattern)")
+            continue
+
         code = file_contents.get(filename)
         if not code:
             continue
@@ -276,7 +286,8 @@ def analyze_pr(pr_url: str, bedrock_client: BedrockClient, report_gen: MarkdownR
             known_issues=known_issues,
             ticket_info=jira_context or ticket_info,
             codebase_context=codebase_context,
-            all_pr_files=all_changed_contents
+            all_pr_files=all_changed_contents,
+            coding_standards=coding_standards
         )
 
         if 'error' in results:
