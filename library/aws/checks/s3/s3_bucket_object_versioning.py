@@ -48,7 +48,7 @@ class s3_bucket_object_versioning(Check):
                     versioning_response = s3_client.get_bucket_versioning(Bucket=bucket_name)
                     versioning_status = versioning_response.get('Status')
                     
-                    if versioning_status == 'Enabled':
+                    if versioning_status == 'Enabled':  # BUG: report.status never set to PASSED
                         report.resource_ids_status.append(
                             ResourceStatus(
                                 resource=AwsResource(arn=bucket_arn),
