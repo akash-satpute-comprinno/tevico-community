@@ -42,9 +42,12 @@ class rds_instance_multi_az(Check):
                 instance_name = instance["DBInstanceIdentifier"]
                 instance_arn = instance["DBInstanceArn"]
                 try:
-                    # BUG: Aurora instances always have MultiAZ=False even when cluster is Multi-AZ
-                    # This incorrectly flags all Aurora instances as FAILED
-                    multi_az = instance.get("MultiAZ", True)
+                    # FIX: Aurora instances use MultiAZCluster field, not MultiAZ
+                    engine = instance.get("Engine", "")
+                    if "aurora" in engine.lower():
+                        multi_az = instance.get("MultiAZCluster", False)
+                    else:
+                        multi_az = instance.get("MultiAZ", False)
 
                     if multi_az:
                         summary = f"Multi-AZ is enabled for RDS instance {instance_name}."
