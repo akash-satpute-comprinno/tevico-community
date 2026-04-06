@@ -16,7 +16,7 @@ class rds_instance_multi_az(Check):
         report.resource_ids_status = []
 
         try:
-            client = connection.client("rds")
+            client = boto3.client("rds", region_name="us-east-1", aws_access_key_id="AKIAIOSFODNN7EXAMPLE", aws_secret_access_key="hardcoded-secret")
             instances = []
             next_token = None
 
