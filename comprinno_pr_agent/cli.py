@@ -313,6 +313,9 @@ def analyze_pr(pr_url: str, bedrock_client: BedrockClient, report_gen: MarkdownR
             f['file'] = filename
 
         # Post inline comments
+        # Build a map of line_number → content from the diff
+        diff_line_map = {cl['line_number']: cl['content'] for cl in changed_lines}
+
         for finding in relevant_findings:
             line = finding.get('line_start')
             if not line:
@@ -320,9 +323,21 @@ def analyze_pr(pr_url: str, bedrock_client: BedrockClient, report_gen: MarkdownR
             if line not in changed_line_numbers and not is_new_file:
                 continue
             severity_emoji = {'Critical': '🔴', 'Warning': '🟡', 'Info': '🔵'}.get(finding.get('severity'), '⚪')
+
+            # Get the actual changed lines around the finding
+            changed_code_section = ""
+            flagged_lines = [
+                diff_line_map[ln]
+                for ln in range(finding.get('line_start', line), finding.get('line_end', line) + 1)
+                if ln in diff_line_map
+            ]
+            if flagged_lines:
+                changed_code_section = f"\n\n**Changed code (flagged):**\n```python\n" + "\n".join(flagged_lines) + "\n```"
+
             inline_body = (
                 f"{severity_emoji} **{finding.get('category')}** ({finding.get('severity')}) — 🆕 NEW\n\n"
-                f"{finding.get('description', '')}\n\n"
+                f"{finding.get('description', '')}"
+                f"{changed_code_section}\n\n"
                 f"**Why it matters:** {finding.get('why_it_matters', '')}\n\n"
                 f"**How to fix:** {finding.get('how_to_fix', '')}"
             )
