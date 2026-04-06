@@ -110,7 +110,8 @@ def validate_commit_messages(commits: List[Dict]) -> List[Dict]:
 
 
 def analyze_pr(pr_url: str, bedrock_client: BedrockClient, report_gen: MarkdownReportGenerator,
-               jira_context: dict = None, previous_comments_context: str = ""):
+               jira_context: dict = None, previous_comments_context: str = "",
+               developer_reply: dict = None):
     """Analyze a GitHub PR with FAISS-based issue tracking"""
     print(f"\n🔗 Analyzing GitHub PR: {pr_url}")
     
@@ -217,7 +218,10 @@ def analyze_pr(pr_url: str, bedrock_client: BedrockClient, report_gen: MarkdownR
 
     # Step 1 — Verify each previous finding with focused AI call
     if previous_findings:
-        print(f"\n🔎 Verifying {len(previous_findings)} previous issue(s)...")
+        if developer_reply and developer_reply.get('intent') == 'resolved':
+            print(f"\n💬 Developer indicated resolution — verifying all previous issues...")
+        else:
+            print(f"\n🔎 Verifying {len(previous_findings)} previous issue(s)...")
         all_current_code = "\n\n".join(
             f"# {fname}\n{code}" for fname, code in file_contents.items()
         )
@@ -365,7 +369,7 @@ def analyze_pr(pr_url: str, bedrock_client: BedrockClient, report_gen: MarkdownR
     
     # Post consolidated comment
     print(f"\n📝 Generating report...")
-    summary = generate_pr_summary(pr_info, pr_files, all_findings, previous_comments, ticket_info=ticket_info, previous_findings=previous_findings, ticket_completion=ticket_completion, resolved_issues=all_resolved_issues, commit_validation=commit_validation, verified_previous=verified_previous)
+    summary = generate_pr_summary(pr_info, pr_files, all_findings, previous_comments, ticket_info=ticket_info, previous_findings=previous_findings, ticket_completion=ticket_completion, resolved_issues=all_resolved_issues, commit_validation=commit_validation, verified_previous=verified_previous, developer_reply=developer_reply)
     github.post_summary_comment(summary)
     
     print(f"\n✅ Analysis complete! Found {len(all_findings)} issue(s)")
@@ -448,7 +452,7 @@ def parse_previous_findings(comments: list) -> list:
     return summary
 
 
-def generate_pr_summary(pr_info: dict, files: List, findings: List, previous_comments: List = None, ticket_info: dict = None, previous_findings: list = None, ticket_completion: dict = None, resolved_issues: list = None, commit_validation: list = None, verified_previous: list = None) -> str:
+def generate_pr_summary(pr_info: dict, files: List, findings: List, previous_comments: List = None, ticket_info: dict = None, previous_findings: list = None, ticket_completion: dict = None, resolved_issues: list = None, commit_validation: list = None, verified_previous: list = None, developer_reply: dict = None) -> str:
     """Generate consolidated PR summary comment with ticket details"""
     critical = sum(1 for f in findings if f.get('severity') == 'Critical')
     warning = sum(1 for f in findings if f.get('severity') == 'Warning')
@@ -456,6 +460,10 @@ def generate_pr_summary(pr_info: dict, files: List, findings: List, previous_com
 
     summary = f"## 🤖 Deep Code Analysis Report\n\n"
     summary += f"**PR:** #{pr_info['number']} - {pr_info['title']}\n\n"
+
+    # Show developer reply context if present
+    if developer_reply and developer_reply.get('intent') == 'resolved':
+        summary += f"> 💬 **Developer indicated:** \"{developer_reply.get('message', '')[:100]}\" — verification results below\n\n"
 
     # Verified previous issues
     if verified_previous:
