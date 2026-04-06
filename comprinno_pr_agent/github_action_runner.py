@@ -21,7 +21,54 @@ from jira_ticket_extractor import JiraTicketExtractor
 from cli import analyze_pr, load_env
 
 
-def get_previous_comments_context(github: GitHubProvider) -> str:
+def parse_developer_reply(comment_body: str) -> dict:
+    """
+    Detect if a developer comment indicates they've resolved issues.
+    Returns dict with intent and any mentioned issue references.
+    """
+    if not comment_body:
+        return {"intent": None}
+
+    body_lower = comment_body.lower().strip()
+
+    # Skip agent's own comments
+    if '🤖' in comment_body or 'Deep Code Analysis' in comment_body:
+        return {"intent": None}
+
+    # Detect resolution intent
+    resolution_keywords = [
+        'resolved', 'fixed', 'done', 'completed', 'addressed',
+        'updated', 'corrected', 'handled', 'implemented'
+    ]
+    for keyword in resolution_keywords:
+        if keyword in body_lower:
+            return {
+                "intent": "resolved",
+                "message": comment_body,
+                "keyword": keyword
+            }
+
+    return {"intent": None}
+
+
+def get_trigger_comment(github: GitHubProvider) -> dict:
+    """Get the comment that triggered this workflow run (if issue_comment event)"""
+    trigger_comment_id = os.getenv('GITHUB_COMMENT_ID')
+    if not trigger_comment_id:
+        return {}
+    try:
+        comments = github.pr.get_issue_comments()
+        for comment in comments:
+            if str(comment.id) == trigger_comment_id:
+                return {
+                    'id': comment.id,
+                    'body': comment.body,
+                    'author': comment.user.login,
+                    'is_bot': comment.user.type == 'Bot' or 'bot' in comment.user.login.lower()
+                }
+    except Exception:
+        pass
+    return {}
     """Extract all previous agent comments as context string for Bedrock"""
     previous_comments = github.get_previous_agent_comments()
     if not previous_comments:
@@ -128,6 +175,14 @@ def main():
         if previous_comments_context:
             print("📋 Previous review comments found — passing as context to avoid repetition")
 
+        # Detect if trigger was a developer reply indicating resolution
+        developer_reply = {}
+        trigger = get_trigger_comment(github)
+        if trigger and not trigger.get('is_bot'):
+            developer_reply = parse_developer_reply(trigger.get('body', ''))
+            if developer_reply.get('intent') == 'resolved':
+                print(f"💬 Developer indicated resolution: '{trigger['body'][:80]}' — will prioritize verification")
+
     except Exception as e:
         print(f"⚠️  Jira integration warning: {e}")
         import traceback
@@ -140,7 +195,8 @@ def main():
     try:
         analyze_pr(pr_url, bedrock_client, report_gen,
                    jira_context=ticket_info,
-                   previous_comments_context=previous_comments_context)
+                   previous_comments_context=previous_comments_context,
+                   developer_reply=developer_reply)
 
         print("\n" + "="*80)
         print("✨ ANALYSIS COMPLETE")
