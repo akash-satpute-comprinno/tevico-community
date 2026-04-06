@@ -64,7 +64,7 @@ class CodebaseContextProvider:
         file_dir = os.path.dirname(file_path)
         dir_path = os.path.join(self.repo_path, file_dir)
         print(f"🔧 Searching dir: {dir_path} (exists: {os.path.exists(dir_path)})")
-        dir_results = self._run_probe("class", language=language, max_tokens=1200, path=dir_path)
+        dir_results = self._run_probe("Check execute connection", language=language, max_tokens=1200, path=dir_path)
         print(f"🔧 Dir search returned: {len(dir_results)} chars")
         if dir_results and file_name not in dir_results:
             context_parts.append(f"### Existing classes in same directory (follow these conventions exactly):\n{dir_results}")
