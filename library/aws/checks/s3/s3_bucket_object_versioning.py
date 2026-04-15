@@ -20,7 +20,6 @@ class s3_bucket_object_versioning(Check):
         report.resource_ids_status = []
 
         try:
-            # Get all buckets
             paginator = s3_client.get_paginator("list_buckets")
             bucket_list = []
 
@@ -38,16 +37,17 @@ class s3_bucket_object_versioning(Check):
                 )
                 return report
 
-            # Check versioning for each bucket
+            # FIX: track if any bucket fails
+            has_failure = False
+
             for bucket in bucket_list:
                 bucket_name = bucket["Name"]
                 bucket_arn = f"arn:aws:s3:::{bucket_name}"
 
                 try:
-                    # Get bucket versioning configuration
                     versioning_response = s3_client.get_bucket_versioning(Bucket=bucket_name)
                     versioning_status = versioning_response.get('Status')
-                    
+
                     if versioning_status == 'Enabled':
                         report.resource_ids_status.append(
                             ResourceStatus(
@@ -57,16 +57,16 @@ class s3_bucket_object_versioning(Check):
                             )
                         )
                     elif versioning_status == 'Suspended':
-                        report.status = CheckStatus.FAILED
+                        has_failure = True
                         report.resource_ids_status.append(
                             ResourceStatus(
                                 resource=AwsResource(arn=bucket_arn),
                                 status=CheckStatus.FAILED,
-                                summary=f"S3 bucket {bucket_name} has object versioning suspended. Previously versioned objects are preserved, but new versions will not be created."
+                                summary=f"S3 bucket {bucket_name} has object versioning suspended."
                             )
                         )
                     else:
-                        report.status = CheckStatus.FAILED
+                        has_failure = True
                         report.resource_ids_status.append(
                             ResourceStatus(
                                 resource=AwsResource(arn=bucket_arn),
@@ -74,9 +74,9 @@ class s3_bucket_object_versioning(Check):
                                 summary=f"S3 bucket {bucket_name} does not have object versioning enabled."
                             )
                         )
-                
+
                 except (BotoCoreError, ClientError) as e:
-                    report.status = CheckStatus.UNKNOWN
+                    has_failure = True
                     report.resource_ids_status.append(
                         ResourceStatus(
                             resource=AwsResource(arn=bucket_arn),
@@ -85,6 +85,9 @@ class s3_bucket_object_versioning(Check):
                             exception=str(e)
                         )
                     )
+
+            # FIX: set final status based on results
+            report.status = CheckStatus.FAILED if has_failure else CheckStatus.PASSED
 
         except (BotoCoreError, ClientError) as e:
             report.status = CheckStatus.UNKNOWN
