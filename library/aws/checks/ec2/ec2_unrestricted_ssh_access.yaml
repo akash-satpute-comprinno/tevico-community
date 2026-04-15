@@ -1,0 +1,26 @@
+Provider: aws
+CheckID: ec2_unrestricted_ssh_access
+CheckTitle: Ensure no security groups allow unrestricted inbound access on SSH port 22
+CheckType: []
+ServiceName: ec2
+SubServiceName: securitygroup
+ResourceIdTemplate: arn:partition:ec2:region:account-id:security-group/sg-id
+Severity: high
+ResourceType: AwsEc2SecurityGroup
+Description: Ensure no EC2 security groups allow unrestricted inbound access (0.0.0.0/0 or ::/0) on SSH port 22
+Risk: Allowing unrestricted SSH access exposes instances to brute force attacks and unauthorized access from any IP address on the internet.
+RelatedUrl: https://tevi.co
+Remediation:
+  Code:
+    CLI: ""
+    NativeIaC: ""
+    Other: ""
+    Terraform: ""
+  Recommendation:
+    Text: Apply Zero Trust approach. Restrict SSH access to specific trusted IP ranges only. Consider using AWS Systems Manager Session Manager instead of direct SSH access.
+    Url: https://docs.aws.amazon.com/vpc/latest/userguide/VPC_SecurityGroups.html
+Categories:
+ - Infrastructure Protection
+DependsOn: []
+RelatedTo: []
+Notes: Infrastructure Protection
